@@ -1,4 +1,4 @@
-// MyScript内置模板:v8
+// MyScript内置模板:v10
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -336,10 +336,15 @@ function chartBlock(d, compact) {
     marks.push({ label: d.hourly[i].hour, value: d.hourly[i].tempNum, symbol: 'circle' });
     values.push(d.hourly[i].tempNum);
   }
-  // 纵轴按这批温度的实际范围自适应（从 0 开始会把曲线挤成直线）
-  var tmin = Math.floor(Math.min(values) - 1);
-  var tmax = Math.ceil(Math.max(values) + 1);
-  if (tmax - tmin < 3) { tmax = tmin + 3; }
+  // 纵轴范围：参考图是 26/28/30/32 这种"间隔 2、跨度 6 度"的样子，
+  // 曲线看起来平缓舒展。若只取 ±1，刻度会变成 30/31/32 这种间隔 1，曲线很陡。
+  var tmin = Math.floor(Math.min(values)) - 2;
+  var tmax = Math.ceil(Math.max(values)) + 2;
+  if (tmax - tmin < 6) {           // 保证至少 6 度跨度
+    var pad = 6 - (tmax - tmin);
+    tmin -= Math.floor(pad / 2);
+    tmax = tmin + 6;
+  }
 
   var chartNode = chart({
     style: 'line', height: compact ? 44 : 56, curved: true,
@@ -394,16 +399,25 @@ function daysBlock(d, withToday, compact) {
   // 只判条数会取到 undefined 并在构建视图时抛错（已踩过）。
   for (var i = 0; i < d.days.length; i++) {
     var x = d.days[i];
-    // 只有"明天"（i === 0）吃掉剩余空间，其余自然宽度
-    var dayProps = (compact && i === 0) ? { frame: { maxWidth: 'infinity' } } : {};
-    cells.push(hstack(merge({ spacing: 4, align: 'center' }, dayProps), [
+    cells.push(hstack({ spacing: 4, align: 'center' }, [
       text(x.label, merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps)),
       image(x.symbol, { frame: { width: 15, height: 15 }, color: PAL.sub }),
       text(x.lo.replace('°', '') + '/' + x.hi,
            merge({ font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 }, fitProps))
     ]));
   }
-  return hstack({ spacing: compact ? 10 : 9, align: 'center' }, cells);
+  // 中号：各项之间用**弹性间隔**（参考图就是这样排的：各项按自然宽度展开、
+  // 空隙自动分配），而不是固定间距 —— 固定间距会让它们挤在一起。
+  // 大号不改（用户明确说大号保持现状）。
+  if (compact) {
+    var spaced = [];
+    for (var k = 0; k < cells.length; k++) {
+      if (k > 0) { spaced.push(spacer()); }
+      spaced.push(cells[k]);
+    }
+    return hstack({ spacing: 0, align: 'center' }, spaced);
+  }
+  return hstack({ spacing: 9, align: 'center' }, cells);
 }
 
 // ── 中号：日期 / 天气 挤在一行 ──────────────────────────────
@@ -470,7 +484,10 @@ function buildView(d) {
 
   // auto 主题不设背景，让系统组件背景透出来（label/secondaryLabel 会自适应）；
   // 只有显式 dark/light 才写死黑白
-  var rootProps = { spacing: compact ? 7 : 9, padding: compact ? 11 : 13 };
+  // 内边距：参考图的内容边距只有 ~9pt，而系统本身还会占一点，
+  // 所以脚本里只留 4pt —— 之前用 11pt，两边各多占 7pt（共 14pt），
+  // 直接把页脚的文字挤到截断。中号收紧，大号保持现状（用户明确说大号别改）。
+  var rootProps = { spacing: compact ? 7 : 9, padding: compact ? 4 : 13 };
   if (d.theme === 'light') { rootProps.background = 'white'; }
   if (d.theme === 'dark') { rootProps.background = 'black'; }
 

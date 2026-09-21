@@ -1,0 +1,106 @@
+// MyScript内置模板:sync2
+// 从任意 HTTP 来源同步脚本（GitHub / 自己的服务器 / 别人的插件源）
+//
+// 【怎么用】
+//   1) 预览面板的「参数」里填来源地址，然后运行；
+//   2) 或者把地址写死在下面的 DEFAULT_SOURCE 里。
+//
+// 【两种来源都支持】
+//   A. 索引文件 index.json（推荐，可一次装多个，方便分享）：
+//        { "scripts": [ { "name": "天气 + 日历", "file": "weather-calendar.js" } ] }
+//      放在 GitHub 仓库里 -> 用 raw 地址：
+//        https://raw.githubusercontent.com/用户名/仓库名/main/index.json
+//   B. 单个 .js 文件：脚本名取文件名
+//        https://raw.githubusercontent.com/用户名/仓库名/main/weather-calendar.js
+//
+// 同名脚本会**原地覆盖代码（id 不变）**，桌面小组件的绑定不受影响。
+
+var DEFAULT_SOURCE = 'http://10.221.148.177:8080/scripts/index.json';
+
+// 统一处理 GitHub 的网页地址 -> raw 地址（用户常常直接复制浏览器地址栏）
+function toRawURL(u) {
+  var s = String(u).trim();
+  // https://github.com/用户/仓库/blob/main/路径 -> raw
+  if (s.indexOf('github.com') >= 0 && s.indexOf('/blob/') >= 0) {
+    s = s.replace('https://github.com/', 'https://raw.githubusercontent.com/')
+         .replace('/blob/', '/');
+  }
+  return s;
+}
+
+function baseDir(u) {
+  var i = String(u).lastIndexOf('/');
+  return i > 0 ? String(u).slice(0, i + 1) : String(u);
+}
+
+function fileNameOf(u) {
+  var s = String(u).split('?')[0];
+  var i = s.lastIndexOf('/');
+  var name = i >= 0 ? s.slice(i + 1) : s;
+  if (name.slice(-3) === '.js') { name = name.slice(0, -3); }
+  return name || '未命名脚本';
+}
+
+var rawSource = String(Widget.parameter || '').trim();
+var source = toRawURL(rawSource || DEFAULT_SOURCE);
+
+var lines = [];
+var okCount = 0;
+var failCount = 0;
+
+function report(title, color) {
+  var kids = [ text(title, {font: 'headline', color: color || PAL.fg}) ];
+  for (var i = 0; i < lines.length; i++) {
+    kids.push(text(lines[i], {font: 'caption2', color: 'secondaryLabel'}));
+  }
+  kids.push(text('来源：' + source, {font: 'caption2', color: 'secondaryLabel', lineLimit: 2}));
+  if (okCount > 0) {
+    kids.push(text('✓ 已更新 ' + okCount + ' 个脚本，回桌面或脚本列表查看',
+                   {font: 'caption2', color: 'systemGreen'}));
+  }
+  return view({spacing: 4}, kids);
+}
+
+// ── 取来源 ──
+var res = await fetch(source);
+var body = res.text();
+if (res.status !== 200 || body.length === 0) {
+  lines.push('✗ 取不到来源：' + (res.error || ('HTTP ' + res.status)));
+  return report('同步失败', 'systemRed');
+}
+
+// ── 判断是索引还是单个脚本 ──
+var isIndex = false;
+var index = null;
+if (body.charAt(0) === '{') {
+  try { index = JSON.parse(body); } catch (e) { index = null; }
+  if (index && index.scripts && index.scripts.length) { isIndex = true; }
+}
+
+if (!isIndex) {
+  // 单个脚本
+  Scripts.upsert(fileNameOf(source), body);
+  okCount++;
+  lines.push('✓ ' + fileNameOf(source) + '（' + body.length + ' 字节）');
+  return report('已安装单个脚本');
+}
+
+// ── 索引：逐个取 ──
+var dir = baseDir(source);
+for (var i = 0; i < index.scripts.length; i++) {
+  var item = index.scripts[i];
+  var fileURL = String(item.file || '').indexOf('http') === 0 ? item.file : (dir + item.file);
+  var one = await fetch(fileURL);
+  var code = one.text();
+  if (one.status === 200 && code.length > 0) {
+    Scripts.upsert(String(item.name || fileNameOf(fileURL)), code);
+    okCount++;
+    lines.push('✓ ' + (item.name || fileNameOf(fileURL)) + '（' + code.length + ' 字节）');
+  } else {
+    failCount++;
+    lines.push('✗ ' + (item.name || item.file) + '：' + (one.error || ('HTTP ' + one.status)));
+  }
+}
+
+return report('脚本同步完成' + (failCount ? '（' + failCount + ' 个失败）' : ''),
+              failCount ? 'systemOrange' : 'systemGreen');

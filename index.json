@@ -1,0 +1,13 @@
+{
+  "comment": "MyScript 脚本同步源；由 scripts/export-templates.sh 从 Swift 内置模板导出",
+  "scripts": [
+    {
+      "name": "天气 + 日历",
+      "file": "weather-calendar.js"
+    },
+    {
+      "name": "同步脚本",
+      "file": "sync-script.js"
+    }
+  ]
+}

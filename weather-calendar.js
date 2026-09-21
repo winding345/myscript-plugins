@@ -1,4 +1,4 @@
-// MyScript内置模板:v10
+// MyScript内置模板:v11
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -481,6 +481,39 @@ function buildView(d) {
   var fam = String(Widget.family || '');
   var compact = fam.indexOf('Medium') >= 0 || fam.indexOf('Small') >= 0;
   var tiny = fam.indexOf('Small') >= 0;
+
+  // 锁屏组件（accessory*）：空间极小，只放最关键的一行
+  if (fam.indexOf('accessory') === 0) {
+    var accessoryProps = { spacing: 2, padding: 2 };
+    if (d.theme === 'light') { accessoryProps.background = 'white'; }
+    if (d.theme === 'dark') { accessoryProps.background = 'black'; }
+
+    if (fam === 'accessoryInline') {
+      // 锁屏单行：只能纯文本
+      return view(accessoryProps, [
+        text(d.temp + ' ' + (d.cond || '') + '  ' + d.city + '  🚶' + d.steps,
+             {font: 'caption2', color: PAL.fg, lineLimit: 1})
+      ]);
+    }
+    if (fam === 'accessoryCircular') {
+      // 圆形：温度 + 天气图标
+      return view({spacing: 0, align: 'center'}, [
+        image(d.symbol, {frame: {width: 16, height: 16}}),
+        text(d.temp, {font: 'headline', weight: 'bold', color: PAL.fg, lineLimit: 1}),
+        text(d.city, {font: 'caption2', color: PAL.sub, lineLimit: 1})
+      ]);
+    }
+    // 矩形：天气 + 步数（两行）
+    return view({spacing: 1}, [
+      hstack({spacing: 4, align: 'center'}, [
+        image(d.symbol, {frame: {width: 13, height: 13}}),
+        text(d.temp + ' ' + (d.cond || ''), {font: 'caption', color: PAL.fg, lineLimit: 1}),
+        spacer(),
+        text('🚶 ' + d.steps, {font: 'caption2', color: PAL.sub, lineLimit: 1})
+      ]),
+      text(d.city + (d.hi ? '  最高 ' + d.hi : ''), {font: 'caption2', color: PAL.sub, lineLimit: 1})
+    ]);
+  }
 
   // auto 主题不设背景，让系统组件背景透出来（label/secondaryLabel 会自适应）；
   // 只有显式 dark/light 才写死黑白

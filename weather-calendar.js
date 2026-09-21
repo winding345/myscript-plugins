@@ -1,4 +1,4 @@
-// MyScript内置模板:v3
+// MyScript内置模板:v4
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -99,15 +99,27 @@ function wmoSymbol(code, isDay) {
   return WMO_SYM[code] || 'cloud.fill';
 }
 
-// 农历：直接借 Intl 的中文日历，不需要原生支持
+// 农历日的中文写法：初一..初十 / 十一..十九 / 二十 / 廿一..廿九 / 三十
+// （Intl 给的是阿拉伯数字"11"，而参考图用的是"十一"）
+function lunarDay(n) {
+  if (n < 1 || n > 30) { return String(n); }
+  var units = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  if (n <= 10) { return '初' + units[n]; }        // 初一..初十
+  if (n < 20) { return '十' + units[n - 10]; }     // 十一..十九
+  if (n === 20) { return '二十'; }
+  if (n < 30) { return '廿' + units[n - 20]; }     // 廿一..廿九
+  return '三十';
+}
+
+// 农历：借 Intl 的中文日历，再把"日"从阿拉伯数字换成中文写法
 function lunarText(date) {
   try {
     var fmt = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'long', day: 'numeric' });
     var raw = fmt.format(date);
-    // Intl 有时会带上年份（丙午年八月初十），只取月日部分
+    // Intl 有时会带上年份（丙午年八月十一），只取月日部分
     var idx = raw.indexOf('年');
     if (idx >= 0) { raw = raw.slice(idx + 1); }
-    return raw;
+    return raw.replace(/[0-9]+$/, function (digits) { return lunarDay(parseInt(digits, 10)); });
   } catch (e) {
     return '';
   }

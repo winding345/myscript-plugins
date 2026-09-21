@@ -1,4 +1,4 @@
-// MyScript内置模板:v5
+// MyScript内置模板:v6
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -358,13 +358,20 @@ function daysBlock(d, withToday, compact) {
     text(placeText, { font: 'caption2', color: placeColor, lineLimit: 1, truncation: 'middle' })
   ]));
 
+  // 中号（compact）：四个格子**均匀铺开**（参考图就是这个排法），
+  //   定位贴左边缘，其余按等宽分布；文字允许缩到 80%，铺开也不会截断。
+  // 大号：保持自然宽度（用户明确说大号不要再动）。
+  var cellProps = compact ? { frame: { maxWidth: 'infinity' } } : {};
+  var fitProps = compact ? { minimumScaleFactor: 0.8 } : {};
+
+  function sub(p) { var o = {}; for (var k in p) { o[k] = p[k]; } return o; }
+  function merge(a, b) { var o = {}; for (var k in a) { o[k] = a[k]; } for (var k in b) { o[k] = b[k]; } return o; }
+
   if (withToday && d.hi) {
-    // 注意：**不要**给这些格子加 maxWidth:'infinity'。
-    // 强行等宽撑满会把文字挤压，导致"明天/后天"双双被截断成 23/...，
-    // 而参考图是按内容自然宽度排的（只有中间那个轻微溢出）。
-    cells.push(hstack({ spacing: 4, align: 'center' }, [
-      text('今天', { font: 'caption2', color: PAL.sub, lineLimit: 1 }),
-      text(d.lo.replace('°', '') + '/' + d.hi, { font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 })
+    cells.push(hstack(merge({ spacing: 4, align: 'center' }, cellProps), [
+      text('今天', merge(merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps), {})),
+      text(d.lo.replace('°', '') + '/' + d.hi,
+           merge({ font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 }, fitProps))
     ]));
   }
 
@@ -374,14 +381,14 @@ function daysBlock(d, withToday, compact) {
   // 只判条数会取到 undefined 并在构建视图时抛错（已踩过）。
   for (var i = 0; i < d.days.length; i++) {
     var x = d.days[i];
-    cells.push(hstack({ spacing: 4, align: 'center' }, [
-      text(x.label, { font: 'caption2', color: PAL.sub, lineLimit: 1 }),
+    cells.push(hstack(merge({ spacing: 4, align: 'center' }, cellProps), [
+      text(x.label, merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps)),
       image(x.symbol, { frame: { width: 15, height: 15 }, color: PAL.sub }),
-      text(x.lo.replace('°', '') + '/' + x.hi, { font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 })
+      text(x.lo.replace('°', '') + '/' + x.hi,
+           merge({ font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 }, fitProps))
     ]));
   }
-  // 自然左对齐 + 固定间距（与参考图一致）；不要用 Spacer 把它们推开
-  return hstack({ spacing: 9, align: 'center' }, cells);
+  return hstack({ spacing: compact ? 10 : 9, align: 'center' }, cells);
 }
 
 // ── 中号：日期 / 天气 挤在一行 ──────────────────────────────

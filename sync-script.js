@@ -1,4 +1,4 @@
-// MyScript内置模板:sync3
+// MyScript内置模板:sync4
 // 从任意 HTTP 来源同步脚本（GitHub / 自己的服务器 / 别人的插件源）
 //
 // 【怎么用】
@@ -73,16 +73,15 @@ function report(title, color) {
   return view({spacing: 4}, kids);
 }
 
-// 给 URL 加上时间戳参数，绕开 GitHub raw 的 CDN 缓存
-// （不加的话，刚推送的改动可能几分钟内取到的还是旧内容，容易误判"同步没生效"）
-function bust(u) {
-  var sep = u.indexOf('?') >= 0 ? '&' : '?';
-  return u + sep + 't=' + Date.now();
-}
+// ⚠️ 这里**不要**给 URL 加时间戳参数（如 ?t=Date.now()）来绕 CDN 缓存。
+// 引擎是"第一遍收集 URL、第二遍注入响应"的两遍模型，时间戳每次都变会让
+// 两遍的 key 对不上，结果是取不到任何响应（表现为"响应尚未取得"），
+// 整个同步脚本失效 —— 这个 bug 真实发生过。
+// GitHub raw 的 CDN 缓存只能靠"等几分钟"规避。
 
 // ── 同步单个来源（索引文件或单个 .js）──
 async function syncOne(source) {
-  var res = await fetch(bust(source));
+  var res = await fetch(source);
   var body = res.text();
   if (res.status !== 200 || body.length === 0) {
     failCount++;
@@ -108,7 +107,7 @@ async function syncOne(source) {
   for (var i = 0; i < index.scripts.length; i++) {
     var item = index.scripts[i];
     var fileURL = String(item.file || '').indexOf('http') === 0 ? item.file : (dir + item.file);
-    var one = await fetch(bust(fileURL));
+    var one = await fetch(fileURL);
     var code = one.text();
     if (one.status === 200 && code.length > 0) {
       Scripts.upsert(String(item.name || fileNameOf(fileURL)), code);

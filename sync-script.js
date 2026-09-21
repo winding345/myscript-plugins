@@ -15,7 +15,8 @@
 //
 // 同名脚本会**原地覆盖代码（id 不变）**，桌面小组件的绑定不受影响。
 
-var DEFAULT_SOURCE = 'http://10.221.148.177:8080/scripts/index.json';
+// 默认来源：用户的 GitHub 插件源仓库（本机服务不会常驻，所以默认走 GitHub）
+var DEFAULT_SOURCE = 'https://raw.githubusercontent.com/winding345/myscript-plugins/main/index.json';
 
 // 统一处理 GitHub 的网页地址 -> raw 地址（用户常常直接复制浏览器地址栏）
 function toRawURL(u) {

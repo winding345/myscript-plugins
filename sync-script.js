@@ -49,7 +49,8 @@ var okCount = 0;
 var failCount = 0;
 
 function report(title, color) {
-  var kids = [ text(title, {font: 'headline', color: color || PAL.fg}) ];
+  // 注意：这里不能用 PAL —— 那是天气脚本自己的变量，不是引擎全局（踩过）
+  var kids = [ text(title, {font: 'headline', color: color || 'label'}) ];
   for (var i = 0; i < lines.length; i++) {
     kids.push(text(lines[i], {font: 'caption2', color: 'secondaryLabel'}));
   }

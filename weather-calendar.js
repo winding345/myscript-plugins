@@ -1,4 +1,4 @@
-// MyScript内置模板:v7
+// MyScript内置模板:v8
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -372,15 +372,17 @@ function daysBlock(d, withToday, compact) {
   // 中号（compact）：四个格子**均匀铺开**（参考图就是这个排法），
   //   定位贴左边缘，其余按等宽分布；文字允许缩到 80%，铺开也不会截断。
   // 大号：保持自然宽度（用户明确说大号不要再动）。
-  var cellProps = compact ? { frame: { maxWidth: 'infinity' } } : {};
-  var fitProps = compact ? { minimumScaleFactor: 0.8 } : {};
+  // 中号的关键：**只让"明天"这一格弹性伸缩**（它会先被压缩/截断），
+  // 城市、今天、后天都保持自然宽度 —— 参考图就是这个效果：只有中间那个
+  // 轻微截断，最后一个始终完整。三格平均等宽会让三个都不够用（踩过）。
+  var fitProps = compact ? { minimumScaleFactor: 0.75 } : {};
 
   function sub(p) { var o = {}; for (var k in p) { o[k] = p[k]; } return o; }
   function merge(a, b) { var o = {}; for (var k in a) { o[k] = a[k]; } for (var k in b) { o[k] = b[k]; } return o; }
 
   if (withToday && d.hi) {
-    cells.push(hstack(merge({ spacing: 4, align: 'center' }, cellProps), [
-      text('今天', merge(merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps), {})),
+    cells.push(hstack({ spacing: 4, align: 'center' }, [
+      text('今天', merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps)),
       text(d.lo.replace('°', '') + '/' + d.hi,
            merge({ font: 'caption2', weight: 'semibold', color: PAL.fg, lineLimit: 1 }, fitProps))
     ]));
@@ -392,7 +394,9 @@ function daysBlock(d, withToday, compact) {
   // 只判条数会取到 undefined 并在构建视图时抛错（已踩过）。
   for (var i = 0; i < d.days.length; i++) {
     var x = d.days[i];
-    cells.push(hstack(merge({ spacing: 4, align: 'center' }, cellProps), [
+    // 只有"明天"（i === 0）吃掉剩余空间，其余自然宽度
+    var dayProps = (compact && i === 0) ? { frame: { maxWidth: 'infinity' } } : {};
+    cells.push(hstack(merge({ spacing: 4, align: 'center' }, dayProps), [
       text(x.label, merge({ font: 'caption2', color: PAL.sub, lineLimit: 1 }, fitProps)),
       image(x.symbol, { frame: { width: 15, height: 15 }, color: PAL.sub }),
       text(x.lo.replace('°', '') + '/' + x.hi,

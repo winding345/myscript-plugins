@@ -1,4 +1,4 @@
-// MyScript内置模板:v6
+// MyScript内置模板:v7
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -15,7 +15,7 @@
 //   UI: view/vstack/hstack/text/image/spacer/divider/chart/progress
 //   Widget.parameter / Widget.family / Widget.name / Widget.present(视图)
 
-// 兜底坐标：改这里成你所在城市
+// 兜底坐标：定位不可用时才用（定位成功时会用系统定位的区县级名字）
 // 杭州 30.2741,120.1551   北京 39.9042,116.4074   上海 31.2304,121.4737
 // 广州 23.1291,113.2644   深圳 22.5431,114.0579   成都 30.5728,104.0668
 var FALLBACK_LAT = 30.2741;
@@ -187,11 +187,13 @@ async function gather() {
     });
   }
 
-  // 城市：参数优先，否则兜底坐标
+  // 位置优先级：参数里的城市 > 系统定位（区县级）> 兜底坐标
   var lat = FALLBACK_LAT;
   var lon = FALLBACK_LON;
   var cityName = FALLBACK_CITY;
+
   if (paramCity) {
+    // 用户显式指定了城市：联网查坐标
     var hit = await geocodeCity(paramCity);
     if (hit) {
       lat = hit.latitude;
@@ -199,6 +201,15 @@ async function gather() {
       cityName = hit.name || paramCity;
     } else {
       cityName = paramCity;
+    }
+  } else {
+    // 没指定就用系统定位：能拿到**区县级**名字（如"滨江区"），
+    // 这正是参考图里显示的那一级（地市级的"杭州"太粗了）
+    var loc = Location.current();
+    if (loc && loc.available) {
+      lat = loc.latitude;
+      lon = loc.longitude;
+      cityName = loc.displayName || loc.city || FALLBACK_CITY;
     }
   }
   d.city = shortPlace(cityName);

@@ -41,8 +41,16 @@ function fileNameOf(u) {
   return name || '未命名脚本';
 }
 
-var rawSource = String(Widget.parameter || '').trim();
-var source = toRawURL(rawSource || DEFAULT_SOURCE);
+// 支持**多个来源**：换行、逗号、空格分隔都行，逐个同步。
+// 例：参数里填
+//   https://raw.githubusercontent.com/你/插件源/main/index.json
+//   http://10.221.148.177:8080/scripts/index.json
+var rawParam = String(Widget.parameter || '').trim();
+var sourceList = (rawParam || DEFAULT_SOURCE)
+  .split(/[\s,]+/)
+  .map(function (s) { return s.trim(); })
+  .filter(function (s) { return s.length > 0; })
+  .map(toRawURL);
 
 var lines = [];
 var okCount = 0;
@@ -54,7 +62,9 @@ function report(title, color) {
   for (var i = 0; i < lines.length; i++) {
     kids.push(text(lines[i], {font: 'caption2', color: 'secondaryLabel'}));
   }
-  kids.push(text('来源：' + source, {font: 'caption2', color: 'secondaryLabel', lineLimit: 2}));
+  for (var k = 0; k < sourceList.length; k++) {
+    kids.push(text('来源：' + sourceList[k], {font: 'caption2', color: 'secondaryLabel', lineLimit: 2}));
+  }
   if (okCount > 0) {
     kids.push(text('✓ 已更新 ' + okCount + ' 个脚本，回桌面或脚本列表查看',
                    {font: 'caption2', color: 'systemGreen'}));
@@ -62,46 +72,50 @@ function report(title, color) {
   return view({spacing: 4}, kids);
 }
 
-// ── 取来源 ──
-var res = await fetch(source);
-var body = res.text();
-if (res.status !== 200 || body.length === 0) {
-  lines.push('✗ 取不到来源：' + (res.error || ('HTTP ' + res.status)));
-  return report('同步失败', 'systemRed');
-}
-
-// ── 判断是索引还是单个脚本 ──
-var isIndex = false;
-var index = null;
-if (body.charAt(0) === '{') {
-  try { index = JSON.parse(body); } catch (e) { index = null; }
-  if (index && index.scripts && index.scripts.length) { isIndex = true; }
-}
-
-if (!isIndex) {
-  // 单个脚本
-  Scripts.upsert(fileNameOf(source), body);
-  okCount++;
-  lines.push('✓ ' + fileNameOf(source) + '（' + body.length + ' 字节）');
-  return report('已安装单个脚本');
-}
-
-// ── 索引：逐个取 ──
-var dir = baseDir(source);
-for (var i = 0; i < index.scripts.length; i++) {
-  var item = index.scripts[i];
-  var fileURL = String(item.file || '').indexOf('http') === 0 ? item.file : (dir + item.file);
-  var one = await fetch(fileURL);
-  var code = one.text();
-  if (one.status === 200 && code.length > 0) {
-    Scripts.upsert(String(item.name || fileNameOf(fileURL)), code);
-    okCount++;
-    lines.push('✓ ' + (item.name || fileNameOf(fileURL)) + '（' + code.length + ' 字节）');
-  } else {
+// ── 同步单个来源（索引文件或单个 .js）──
+async function syncOne(source) {
+  var res = await fetch(source);
+  var body = res.text();
+  if (res.status !== 200 || body.length === 0) {
     failCount++;
-    lines.push('✗ ' + (item.name || item.file) + '：' + (one.error || ('HTTP ' + one.status)));
+    lines.push('✗ ' + source + '：' + (res.error || ('HTTP ' + res.status)));
+    return;
+  }
+
+  var isIndex = false;
+  var index = null;
+  if (body.charAt(0) === '{') {
+    try { index = JSON.parse(body); } catch (e) { index = null; }
+    if (index && index.scripts && index.scripts.length) { isIndex = true; }
+  }
+
+  if (!isIndex) {
+    Scripts.upsert(fileNameOf(source), body);
+    okCount++;
+    lines.push('✓ ' + fileNameOf(source) + '（' + body.length + ' 字节）');
+    return;
+  }
+
+  var dir = baseDir(source);
+  for (var i = 0; i < index.scripts.length; i++) {
+    var item = index.scripts[i];
+    var fileURL = String(item.file || '').indexOf('http') === 0 ? item.file : (dir + item.file);
+    var one = await fetch(fileURL);
+    var code = one.text();
+    if (one.status === 200 && code.length > 0) {
+      Scripts.upsert(String(item.name || fileNameOf(fileURL)), code);
+      okCount++;
+      lines.push('✓ ' + (item.name || fileNameOf(fileURL)) + '（' + code.length + ' 字节）');
+    } else {
+      failCount++;
+      lines.push('✗ ' + (item.name || item.file) + '：' + (one.error || ('HTTP ' + one.status)));
+    }
   }
 }
 
-return report('脚本同步完成' + (failCount ? '（' + failCount + ' 个失败）' : ''),
+for (var si = 0; si < sourceList.length; si++) {
+  await syncOne(sourceList[si]);
+}
+
+return report(sourceList.length > 1 ? '同步完成（' + sourceList.length + ' 个来源）' : '脚本同步完成',
               failCount ? 'systemOrange' : 'systemGreen');

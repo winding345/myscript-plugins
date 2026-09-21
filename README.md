@@ -3,6 +3,26 @@
 给 **MyScript**（iOS 自用脚本小组件 App）用的脚本源。
 放在 GitHub 上就是一个可分享的"插件源"，别人填你的 raw 地址即可一键安装。
 
+## 怎么把它变成"可分享的插件源"（3 步，全在 GitHub 网页上）
+
+**第 1 步：建仓库**（或直接用你已有的仓库）
+- 打开 https://github.com/new
+- Repository name 填 `myscript-plugins`
+- 选 **Public**（私有仓库的 raw 链接需要鉴权，别人装不了）
+- 点 Create repository
+
+**第 2 步：上传本目录的 4 个文件**
+- 在仓库页面点 **Add file → Upload files**
+- 把本目录里的 `index.json`、`weather-calendar.js`、`sync-script.js`、`README.md` 拖进去
+- 点 **Commit changes**
+
+**第 3 步：拿到 raw 链接**
+- 点开 `index.json` → 右上角 **Raw** → 复制地址栏
+- 形如：
+  `https://raw.githubusercontent.com/winding345/myscript-plugins/main/index.json`
+
+（把上面地址里的用户名/仓库名换成你自己的即可）
+
 ## 别人的安装方式
 
 **方式一（推荐）：App 内粘贴链接**

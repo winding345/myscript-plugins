@@ -1,4 +1,4 @@
-// MyScript内置模板:sync4
+// MyScript内置模板:sync5
 // 从任意 HTTP 来源同步脚本（GitHub / 自己的服务器 / 别人的插件源）
 //
 // 【怎么用】
@@ -27,6 +27,13 @@ function toRawURL(u) {
          .replace('/blob/', '/');
   }
   return s;
+}
+
+// 从脚本代码里取出版本标记，如 "// MyScript内置模板:v11" -> "v11"
+function versionTag(code) {
+  if (!code) { return ''; }
+  var m = String(code).match(/MyScript内置模板:(v[0-9]+)/);
+  return m ? m[1] : '';
 }
 
 function baseDir(u) {
@@ -110,9 +117,20 @@ async function syncOne(source) {
     var one = await fetch(fileURL);
     var code = one.text();
     if (one.status === 200 && code.length > 0) {
-      Scripts.upsert(String(item.name || fileNameOf(fileURL)), code);
+      var scriptName = String(item.name || fileNameOf(fileURL));
+      // 更新提示：比较本地与新版的内置模板版本标记（形如 // MyScript内置模板:v11）
+      var localCode = Scripts.get(scriptName);
+      var localVer = versionTag(localCode);
+      var remoteVer = versionTag(code);
+      Scripts.upsert(scriptName, code);
       okCount++;
-      lines.push('✓ ' + (item.name || fileNameOf(fileURL)) + '（' + code.length + ' 字节）');
+      if (localVer && remoteVer && localVer !== remoteVer) {
+        lines.push('↑ ' + scriptName + '：' + localVer + ' → ' + remoteVer + '（已更新）');
+      } else if (!localVer) {
+        lines.push('＋ ' + scriptName + '：新安装（' + code.length + ' 字节）');
+      } else {
+        lines.push('＝ ' + scriptName + '：已是最新（' + remoteVer + '）');
+      }
     } else {
       failCount++;
       lines.push('✗ ' + (item.name || item.file) + '：' + (one.error || ('HTTP ' + one.status)));

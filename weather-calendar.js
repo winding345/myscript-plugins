@@ -1,4 +1,4 @@
-// MyScript内置模板:v12
+// MyScript内置模板:v13
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -144,9 +144,13 @@ for (var si = 0; si < segs.length; si++) {
   var low = piece.toLowerCase();
   if (low === 'dark' || low === 'light' || low === 'auto') { paramTheme = low; }
   else if (/^[0-9]+$/.test(piece)) { paramGoal = parseInt(piece, 10); }
-  else if (/^(model=)?(best|best_match|cma|cma_grapes_global|icon|icon_seamless)$/.test(low)) {
-    if (low.indexOf('cma') >= 0) { paramModel = 'cma'; }
-    else if (low.indexOf('icon') >= 0) { paramModel = 'icon'; }
+  else if (low.indexOf('model=') === 0 || /^(best|best_match|cma|cma_grapes_global|icon|icon_seamless)$/.test(low)) {
+    // 放宽识别：model= 后面写什么都行（cma / CMA / cma_grapes_global / icon_seamless…），
+    // 只要含 cma 就当中国气象局、含 icon 就当 DWD，其余按 best。
+    // 之前是精确匹配整串，写法稍有出入就会被当成城市名（踩过）。
+    var mv = low.indexOf('model=') === 0 ? low.substring(6) : low;
+    if (mv.indexOf('cma') >= 0) { paramModel = 'cma'; }
+    else if (mv.indexOf('icon') >= 0) { paramModel = 'icon'; }
     else { paramModel = 'best'; }
   }
   else if (piece) { paramCity = piece; }

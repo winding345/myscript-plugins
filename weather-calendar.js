@@ -1,4 +1,4 @@
-// MyScript内置模板:v11
+// MyScript内置模板:v12
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -6,7 +6,9 @@
 //   杭州            指定城市（联网查坐标）
 //   dark / light    强制主题；不写则跟随系统（用自适应的 label/secondaryLabel）
 //   8000            步数目标（纯数字那一段）
-//   杭州,dark,8000  三者任意组合，顺序随便
+//   model=cma       天气模型：cma=中国气象局（对齐国内天气 App）、
+//                   icon=德国 DWD（分辨率高）、best=默认折中
+//   杭州,dark,8000,model=cma   任意组合，顺序随便
 //
 // 【可用 API 速查】
 //   Health.todaySteps() / Health.sum(类型, 天数) / Health.average(类型, 天数) / Health.latest(类型)
@@ -131,12 +133,30 @@ var segs = rawParam.split(',');
 var paramCity = '';
 var paramTheme = '';
 var paramGoal = 0;
+// 天气模型：不同模型差异很大（实测杭州同一时刻能差 2.5°、今天最高温差 3.2°）。
+//   best（默认）   open-meteo 的 best_match，全球折中
+//   cma            中国气象局 GRAPES —— 中国天气网/和风这类国内服务基本基于它
+//   icon           德国 DWD ICON，分辨率更高
+// 想和国内天气 App 对齐就用 cma；写法：参数里加一段 model=cma 或直接写 cma
+var paramModel = 'best';
 for (var si = 0; si < segs.length; si++) {
   var piece = segs[si].trim();
   var low = piece.toLowerCase();
   if (low === 'dark' || low === 'light' || low === 'auto') { paramTheme = low; }
   else if (/^[0-9]+$/.test(piece)) { paramGoal = parseInt(piece, 10); }
+  else if (/^(model=)?(best|best_match|cma|cma_grapes_global|icon|icon_seamless)$/.test(low)) {
+    if (low.indexOf('cma') >= 0) { paramModel = 'cma'; }
+    else if (low.indexOf('icon') >= 0) { paramModel = 'icon'; }
+    else { paramModel = 'best'; }
+  }
   else if (piece) { paramCity = piece; }
+}
+
+// 参数里的简写 -> open-meteo 的 models 取值
+function modelQuery() {
+  if (paramModel === 'cma') { return '&models=cma_grapes_global'; }
+  if (paramModel === 'icon') { return '&models=icon_seamless'; }
+  return '';
 }
 
 async function geocodeCity(name) {
@@ -230,7 +250,8 @@ async function gather() {
       + '&current=temperature_2m,weather_code,is_day'
       + '&hourly=temperature_2m,weather_code'
       + '&daily=weather_code,temperature_2m_max,temperature_2m_min'
-      + '&timezone=Asia%2FShanghai&forecast_days=3';
+      + '&timezone=Asia%2FShanghai&forecast_days=3'
+      + modelQuery();          // 见参数说明：model=cma 可对齐国内天气
     var res = await fetch(url);
     var j = res.json();
 

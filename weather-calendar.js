@@ -1,4 +1,4 @@
-// MyScript内置模板:v13
+// MyScript内置模板:v14
 // 天气 + 日历 · 大号小组件（MyScript 版）
 //
 // 【参数（小组件配置里的「参数」字段）】
@@ -129,32 +129,42 @@ function lunarText(date) {
 
 // ── 参数解析 ────────────────────────────────────────────────
 var rawParam = String(Widget.parameter || '').trim();
-var segs = rawParam.split(',');
+// 分隔符宽容：英文逗号、中文逗号、顿号、空格都当分隔符（之前只认英文逗号，
+// 打错一个标点整段就会被当成城市名）
+var segs = rawParam.replace(/[，、]/g, ',').split(/[\s,]+/);
 var paramCity = '';
 var paramTheme = '';
 var paramGoal = 0;
-// 天气模型：不同模型差异很大（实测杭州同一时刻能差 2.5°、今天最高温差 3.2°）。
-//   best（默认）   open-meteo 的 best_match，全球折中
-//   cma            中国气象局 GRAPES —— 中国天气网/和风这类国内服务基本基于它
-//   icon           德国 DWD ICON，分辨率更高
-// 想和国内天气 App 对齐就用 cma；写法：参数里加一段 model=cma 或直接写 cma
+// 天气模型：不同模型差异很大（实测杭州同一时刻能差 2.5°、最高温差 3.2°）
+//   best   open-meteo 默认折中     cma  中国气象局（对齐国内天气 App）
+//   icon   德国 DWD，分辨率更高
 var paramModel = 'best';
+
+function isModelToken(t) {
+  var l = String(t).toLowerCase();
+  if (l.indexOf('model=') === 0) { return true; }
+  return /^(best|best_match|cma|cma_grapes_global|icon|icon_seamless)$/.test(l);
+}
+function modelFromToken(t) {
+  var l = String(t).toLowerCase();
+  var v = l.indexOf('model=') === 0 ? l.substring(6) : l;
+  if (v.indexOf('cma') >= 0) { return 'cma'; }
+  if (v.indexOf('icon') >= 0) { return 'icon'; }
+  return 'best';
+}
+
+var cityParts = [];
 for (var si = 0; si < segs.length; si++) {
   var piece = segs[si].trim();
+  if (!piece) { continue; }
   var low = piece.toLowerCase();
-  if (low === 'dark' || low === 'light' || low === 'auto') { paramTheme = low; }
+  if (isModelToken(piece)) { paramModel = modelFromToken(piece); }
+  else if (low === 'dark' || low === 'light' || low === 'auto') { paramTheme = low; }
   else if (/^[0-9]+$/.test(piece)) { paramGoal = parseInt(piece, 10); }
-  else if (low.indexOf('model=') === 0 || /^(best|best_match|cma|cma_grapes_global|icon|icon_seamless)$/.test(low)) {
-    // 放宽识别：model= 后面写什么都行（cma / CMA / cma_grapes_global / icon_seamless…），
-    // 只要含 cma 就当中国气象局、含 icon 就当 DWD，其余按 best。
-    // 之前是精确匹配整串，写法稍有出入就会被当成城市名（踩过）。
-    var mv = low.indexOf('model=') === 0 ? low.substring(6) : low;
-    if (mv.indexOf('cma') >= 0) { paramModel = 'cma'; }
-    else if (mv.indexOf('icon') >= 0) { paramModel = 'icon'; }
-    else { paramModel = 'best'; }
-  }
-  else if (piece) { paramCity = piece; }
+  else { cityParts.push(piece); }
 }
+// 双保险：就算上面哪条分支没命中，也绝不允许模型相关词混进城市名
+paramCity = cityParts.filter(function (t) { return !isModelToken(t); }).join('');
 
 // 参数里的简写 -> open-meteo 的 models 取值
 function modelQuery() {

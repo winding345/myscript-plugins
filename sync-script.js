@@ -1,4 +1,4 @@
-// MyScript内置模板:sync5
+// MyScript内置模板:sync6
 // 从任意 HTTP 来源同步脚本（GitHub / 自己的服务器 / 别人的插件源）
 //
 // 【怎么用】
@@ -32,7 +32,10 @@ function toRawURL(u) {
 // 从脚本代码里取出版本标记，如 "// MyScript内置模板:v11" -> "v11"
 function versionTag(code) {
   if (!code) { return ''; }
-  var m = String(code).match(/MyScript内置模板:(v[0-9]+)/);
+  // 只认【行首】的版本标记，且允许任意记号（v11 / sync5 …）。
+  // 之前是全串搜索 /MyScript内置模板:(v[0-9]+)/，结果匹配到了本文件注释里的
+  // 示例文字（"如 // MyScript内置模板:v11"），导致同步脚本永远自报 v11。
+  var m = String(code).match(/^\/\/\s*MyScript内置模板:(\S+)/m);
   return m ? m[1] : '';
 }
 
